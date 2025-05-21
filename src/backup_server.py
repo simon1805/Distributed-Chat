@@ -25,6 +25,7 @@ def monitor_heartbeat():
 
 def run_backup_server():
     global last_heartbeat
+    join_system()
     threading.Thread(target=monitor_heartbeat, daemon=True).start()
     while True:
         time.sleep(1)
@@ -44,6 +45,7 @@ def handle_client(conn, addr):
                 clients[conn] = username
             broadcast(f"[System] {username} ist dem Chat beigetreten.", conn)
             logging.info(f"{username} (via Backup) verbunden.")
+            
 
         while True:
             msg = conn.recv(1024).decode()
@@ -81,6 +83,18 @@ def start_server():
     while True:
         conn, addr = server.accept()
         threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+
+def join_system():
+    while True:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.connect((PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT))
+            sock.send("[SERVER]".encode())
+            print("Server mit System verbunden")
+            break
+        except:
+            print("[System] Server nicht erreichbar. Neuer Versuch in 2 Sekunden...")
+            time.sleep(2)
 
 if __name__ == "__main__":
     run_backup_server()

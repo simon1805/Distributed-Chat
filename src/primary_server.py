@@ -11,11 +11,11 @@ clients = {}
 servers = {}
 lock = threading.Lock()
 
-def handle_client(conn, addr):
+def handle_client(conn, addr, join_msg):
     username = ""
     try:
         # Empfange erste Nachricht mit Benutzernamen
-        join_msg = conn.recv(1024).decode()
+        print(join_msg)
         if join_msg.startswith("[JOIN] "):
             username = join_msg.split("[JOIN] ")[1].strip()
             with lock:
@@ -40,8 +40,14 @@ def handle_client(conn, addr):
             print(f"{username} getrennt.")
         conn.close()
 
-def handle_server():
-    print("Hier")
+def handle_server(conn, addr):
+    try:
+        print("Backupserver möchte sich anschließen")
+    except Exception as e:
+        logging.error(f"Fehler bei {addr}: {e}")
+
+
+
 
 def broadcast(message, sender_conn):
     with lock:
@@ -74,7 +80,11 @@ def start_server():
 
     while True:
         conn, addr = server.accept()
-        threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
+        join_msg = conn.recv(1024).decode()
+        if join_msg.startswith("[JOIN] "):
+            threading.Thread(target=handle_client, args=(conn, addr, join_msg), daemon=True).start()
+        elif join_msg.startswith("[SERVER]"):
+            threading.Thread(target=handle_server, args=(conn, addr), daemon=True).start()
 
 if __name__ == "__main__":
     start_server()
