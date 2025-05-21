@@ -9,6 +9,7 @@ logging.basicConfig(filename='chat.log', level=logging.INFO, format='%(asctime)s
 clients = {}
 last_heartbeat = time.time()
 lock = threading.Lock()
+leader=False
 
 def monitor_heartbeat():
     global last_heartbeat

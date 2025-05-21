@@ -75,3 +75,6 @@
 2025-05-16 14:34:14,317 [INFO] A: A: asds
 2025-05-16 14:34:18,773 [INFO] B: [LEAVE] B
 2025-05-16 14:34:20,071 [INFO] A: [LEAVE] A
+2025-05-21 15:33:20,536 [ERROR] Fehler bei ('134.103.149.134', 60901): can only concatenate str (not "list") to str
+2025-05-21 15:34:13,454 [WARNING] Backup-Server übernimmt wegen Serverausfall.
+2025-05-21 15:35:17,981 [ERROR] Fehler bei ('134.103.149.134', 60963): can only concatenate str (not "list") to str

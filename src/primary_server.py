@@ -8,8 +8,10 @@ from config import BACKUP_SERVER_HOST, BACKUP_SERVER_PORT, PRIMARY_SERVER_HOST, 
 logging.basicConfig(filename='chat.log', level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 clients = {}
-servers = {}
+servers = []
 lock = threading.Lock()
+ring=None
+leader=True
 
 def handle_client(conn, addr, join_msg):
     username = ""
@@ -41,8 +43,11 @@ def handle_client(conn, addr, join_msg):
         conn.close()
 
 def handle_server(conn, addr):
+    global servers
     try:
         print("Backupserver möchte sich anschließen")
+        servers.append(addr[0])
+        print("Server list: "+ servers)
     except Exception as e:
         logging.error(f"Fehler bei {addr}: {e}")
 
@@ -70,6 +75,7 @@ def heartbeat():
         time.sleep(HEARTBEAT_INTERVAL)
 
 def start_server():
+    global servers
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT))
     server.listen()
@@ -77,6 +83,7 @@ def start_server():
     print("Primärer Server gestartet.")
 
     threading.Thread(target=heartbeat, daemon=True).start()
+    servers=[PRIMARY_SERVER_HOST]
 
     while True:
         conn, addr = server.accept()
