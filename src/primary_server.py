@@ -8,6 +8,7 @@ from config import BACKUP_SERVER_HOST, BACKUP_SERVER_PORT, PRIMARY_SERVER_HOST, 
 logging.basicConfig(filename='chat.log', level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 clients = {}
+servers = {}
 lock = threading.Lock()
 
 def handle_client(conn, addr):
@@ -26,18 +27,21 @@ def handle_client(conn, addr):
             msg = conn.recv(1024).decode()
             if not msg:
                 break
-            print(f"{username}: {msg}")
+            print(f"{msg}")
             broadcast(msg, conn)
 
     except Exception as e:
         logging.error(f"Fehler bei {addr}: {e}")
     finally: # Hier wird der Client die verbindung schließen.
         with lock:
-            if conn in clients:
-                left_user = clients.pop(conn)
-                broadcast(f"[System] {left_user} hat den Chat verlassen.", conn)
-                print(f"{left_user} getrennt.")
+             # Todo: wird nicht aufgerufen
+            clients.pop(conn)
+            broadcast(f"[System] {username} hat den Chat verlassen.", conn)
+            print(f"{username} getrennt.")
         conn.close()
+
+def handle_server():
+    print("Hier")
 
 def broadcast(message, sender_conn):
     with lock:
