@@ -2,7 +2,7 @@ import socket
 import threading
 import time
 import logging
-from config import BACKUP_SERVER_HOST, BACKUP_SERVER_PORT, PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT, HEARTBEAT_INTERVAL
+from config import BACKUP_SERVER_HOST, BACKUP_SERVER_PORT, PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT, HEARTBEAT_INTERVAL, ZERO_HOST
 
 # Logging konfigurieren
 logging.basicConfig(filename='chat.log', level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -44,12 +44,14 @@ def handle_client(conn, addr, join_msg):
 
 def handle_server(conn, addr):
     global servers
+    global ring
     try:
         print("Backupserver möchte sich anschließen")
-        servers.append(addr[0])
-        print("Server list: "+ servers)
+        print(addr[0])
+        ring = form_ring(servers)
+        print(f"Ring: {ring}")
     except Exception as e:
-        logging.error(f"Fehler bei {addr}: {e}")
+        logging.error(f"Fehler bei Server mit {addr}: {e}")
 
 
 
@@ -92,6 +94,12 @@ def start_server():
             threading.Thread(target=handle_client, args=(conn, addr, join_msg), daemon=True).start()
         elif join_msg.startswith("[SERVER]"):
             threading.Thread(target=handle_server, args=(conn, addr), daemon=True).start()
+            
+# forms a ring out of the server List
+def form_ring(members):
+    sorted_binary_ring=sorted([socket.inet_aton(member)for member in members])
+    sorted_ip_ring=[socket.inet_ntoa(node) for node in sorted_binary_ring]
+    return sorted_ip_ring
 
 if __name__ == "__main__":
     start_server()

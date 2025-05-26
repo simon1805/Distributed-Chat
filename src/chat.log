@@ -78,3 +78,12 @@
 2025-05-21 15:33:20,536 [ERROR] Fehler bei ('134.103.149.134', 60901): can only concatenate str (not "list") to str
 2025-05-21 15:34:13,454 [WARNING] Backup-Server übernimmt wegen Serverausfall.
 2025-05-21 15:35:17,981 [ERROR] Fehler bei ('134.103.149.134', 60963): can only concatenate str (not "list") to str
+2025-05-26 19:10:50,169 [ERROR] Fehler bei ('172.17.112.1', 53414): can only concatenate str (not "list") to str
+2025-05-26 19:12:38,203 [WARNING] Backup-Server übernimmt wegen Serverausfall.
+2025-05-26 19:12:38,204 [INFO] Backup-Server aktiv.
+2025-05-26 19:36:24,121 [WARNING] Backup-Server übernimmt wegen Serverausfall.
+2025-05-26 19:36:24,121 [INFO] Backup-Server aktiv.
+2025-05-26 19:38:07,419 [WARNING] Backup-Server übernimmt wegen Serverausfall.
+2025-05-26 19:38:07,420 [INFO] Backup-Server aktiv.
+2025-05-26 19:38:08,528 [INFO] S (via Backup) verbunden.
+2025-05-26 19:38:42,241 [INFO] S (via Backup): [LEAVE] S

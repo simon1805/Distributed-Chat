@@ -1,0 +1,5 @@
+2025-05-26 19:17:01,108 [WARNING] Backup-Server übernimmt wegen Serverausfall.
+2025-05-26 19:37:19,403 [ERROR] Fehler bei ('172.17.112.1', 51598): can only concatenate str (not "list") to str
+2025-05-26 19:43:45,012 [ERROR] Fehler bei ('172.17.112.1', 51926): can only concatenate str (not "list") to str
+2025-05-26 21:33:40,073 [WARNING] Backup-Server übernimmt wegen Serverausfall.
+2025-05-26 21:33:40,074 [INFO] Backup-Server aktiv.
