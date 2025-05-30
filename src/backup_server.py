@@ -7,9 +7,11 @@ from config import BACKUP_SERVER_HOST, BACKUP_SERVER_PORT, PRIMARY_SERVER_HOST, 
 logging.basicConfig(filename='chat.log', level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 clients = {}
+ring = None
 last_heartbeat = time.time()
 lock = threading.Lock()
 leader=False
+sock = None
 
 def monitor_heartbeat():
     global last_heartbeat
@@ -24,10 +26,24 @@ def monitor_heartbeat():
                 last_heartbeat = time.time()
             conn.close()
 
+def monitor_message():
+    global sock
+    print("Monitoring messages")
+    while True:
+            try:
+                msg = sock.recv(1024)
+                if msg:
+                    print(msg)
+            except Exception as e:
+                print(f"[System] Verbindung unterbrochen: {e}")
+
+
+
 def run_backup_server():
     global last_heartbeat
     join_system()
     threading.Thread(target=monitor_heartbeat, daemon=True).start()
+    threading.Thread(target=monitor_message, daemon=True).start()
     while True:
         time.sleep(1)
         if time.time() - last_heartbeat > HEARTBEAT_TIMEOUT:
@@ -86,6 +102,7 @@ def start_server():
         threading.Thread(target=handle_client, args=(conn, addr), daemon=True).start()
 
 def join_system():
+    global sock
     while True:
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -93,9 +110,10 @@ def join_system():
             sock.send("[SERVER]".encode())
             print("Server mit System verbunden")
             break
-        except:
-            print("[System] Server nicht erreichbar. Neuer Versuch in 2 Sekunden...")
+        except Exception as e:
+            print(e)
             time.sleep(2)
+    print("Ende von Join System")
 
 if __name__ == "__main__":
     run_backup_server()
