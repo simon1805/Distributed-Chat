@@ -10,7 +10,7 @@ clients = {}
 ring = None
 last_heartbeat = time.time()
 lock = threading.Lock()
-leader=False
+leader=""
 sock = None
 
 def monitor_heartbeat():
@@ -28,25 +28,38 @@ def monitor_heartbeat():
 
 def monitor_message():
     global sock
-    print("Monitoring messages")
+    global ring
+    global leader
+    
     while True:
             try:
-                msg = sock.recv(1024)
+                msg = sock.recv(1024).decode()
                 if msg:
-                    print(msg)
+                    if "[RING]" in msg:
+                        ring = get_ring(msg)
+                        print(f"Actual Ring: {ring}")
+                    elif "[LEADER]" in msg:
+                        leader= msg.split()[1]
+                        print(f"Actual Leader: {leader}")
             except Exception as e:
                 print(f"[System] Verbindung unterbrochen: {e}")
 
-
+def get_ring(msg):
+    res = []
+    if len(msg.split("[")) > 2:
+        values = msg.split("[")[2].split("]")[0].split(",")
+        for val in values:
+            res.append(val.split("'")[1])
+    return res
 
 def run_backup_server():
     global last_heartbeat
     join_system()
-    threading.Thread(target=monitor_heartbeat, daemon=True).start()
+    # threading.Thread(target=monitor_heartbeat, daemon=True).start()
     threading.Thread(target=monitor_message, daemon=True).start()
     while True:
         time.sleep(1)
-        if time.time() - last_heartbeat > HEARTBEAT_TIMEOUT:
+        if time.time() - last_heartbeat > HEARTBEAT_TIMEOUT and False:
             print("[ÜBERNAHME] Kein Heartbeat erkannt. Backup-Server wird aktiv.")
             logging.warning("Backup-Server übernimmt wegen Serverausfall.")
             start_server()

@@ -8,10 +8,11 @@ from config import BACKUP_SERVER_HOST, BACKUP_SERVER_PORT, PRIMARY_SERVER_HOST, 
 logging.basicConfig(filename='chat.log', level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 clients = {}
-servers = []
+
+servers = {}
 lock = threading.Lock()
 ring=None
-leader=True
+leader=PRIMARY_SERVER_HOST
 
 def handle_client(conn, addr, join_msg):
     username = ""
@@ -22,7 +23,7 @@ def handle_client(conn, addr, join_msg):
             username = join_msg.split("[JOIN] ")[1].strip()
             with lock:
                 clients[conn] = username
-            broadcast(f"[System] {username} ist dem Chat beigetreten.", conn)
+            broadcast(f"[System] {username} ist dem Chat beigetreten.", conn,"client")
             print(f"{username} von {addr} verbunden.")
 
         while True:
@@ -30,7 +31,7 @@ def handle_client(conn, addr, join_msg):
             if not msg:
                 break
             print(f"{msg}")
-            broadcast(msg, conn)
+            broadcast(msg, conn,"client")
 
     except Exception as e:
         logging.error(f"Fehler bei {addr}: {e}")
@@ -38,33 +39,48 @@ def handle_client(conn, addr, join_msg):
         with lock:
              # Todo: wird nicht aufgerufen
             clients.pop(conn)
-            broadcast(f"[System] {username} hat den Chat verlassen.", conn)
+            broadcast(f"[System] {username} hat den Chat verlassen.", conn,"client")
             print(f"{username} getrennt.")
         conn.close()
 
 def handle_server(conn, addr):
-    global servers
     global ring
+    global leader
+    
     try:
         print("Backupserver möchte sich anschließen")
         print(addr[0])
-        ring = form_ring(servers)
+        with lock:
+            servers[conn]= addr[0]
+            ring = form_ring(servers.values())
         print(f"Ring: {ring}")
+        broadcast(f"[RING] {ring}",conn, "server")
+        broadcast(f"[LEADER] {leader}",conn, "server")
     except Exception as e:
         logging.error(f"Fehler bei Server mit {addr}: {e}")
+        print(e)
 
 
 
 
-def broadcast(message, sender_conn):
+def broadcast(message, sender_conn, typ):
     with lock:
-        for client in list(clients.keys()):
-            if client != sender_conn:
-                try:
-                    client.send(message.encode())
-                except:
-                    client.close()
-                    clients.pop(client, None)
+        if typ=="client":
+            for client in list(clients.keys()):
+                if client != sender_conn:
+                    try:
+                        client.send(message.encode())
+                    except:
+                        client.close()
+                        clients.pop(client, None)
+        if typ=="server":               
+            for server in list(servers.keys()):
+                if server == sender_conn:
+                    try:
+                        server.send(message.encode())
+                    except Exception as e:
+                        server.close()
+                        print(e)
 
 def heartbeat():
     while True:
@@ -78,14 +94,16 @@ def heartbeat():
 
 def start_server():
     global servers
+    
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT))
     server.listen()
+    servers[server] = PRIMARY_SERVER_HOST
+    print(servers)
     print(f"[START] Primärer Server läuft auf {PRIMARY_SERVER_HOST}:{PRIMARY_SERVER_PORT}")
     print("Primärer Server gestartet.")
 
-    threading.Thread(target=heartbeat, daemon=True).start()
-    servers=[PRIMARY_SERVER_HOST]
+    # threading.Thread(target=heartbeat, daemon=True).start()
 
     while True:
         conn, addr = server.accept()
