@@ -2,11 +2,13 @@ import socket
 import threading
 import time
 import logging
+import ast
 from config import BACKUP_SERVER_HOST, BACKUP_SERVER_PORT, PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT, HEARTBEAT_TIMEOUT
 
 logging.basicConfig(filename='chat.log', level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 clients = {}
+client_ip = []
 ring = None
 last_heartbeat = time.time()
 lock = threading.Lock()
@@ -30,19 +32,36 @@ def monitor_message():
     global sock
     global ring
     global leader
-    
+    global last_heartbeat
+    global client_ip
     while True:
             try:
                 msg = sock.recv(1024).decode()
                 if msg:
-                    if "[RING]" in msg:
-                        ring = get_ring(msg)
-                        print(f"Actual Ring: {ring}")
-                    elif "[LEADER]" in msg:
-                        leader= msg.split()[1]
-                        print(f"Actual Leader: {leader}")
+                    if "[RING]" in msg and "[LEADER]" in msg and "[CLIENT]" in msg:
+                        msg_client = msg.split("[CLIENT]")
+                        msg_leader = msg_client[0].split("[LEADER]")
+                        msg_ring= msg_leader[0].split("[RING]")[1]
+                        client_ip=ast.literal_eval(msg_client[1])
+                        leader=msg_leader[1]
+                        ring=ast.literal_eval(msg_ring)
+                        print(f"Servers: {ring}")
+                        print(f"CLients: {client_ip}")
+                        print(f"Leader: {leader}")
+
+                    elif "[CLIENT]" in msg:
+                        client_ip=ast.literal_eval(msg.split("[CLIENT]")[1])
+                        print(f"New CLient arrived: {client_ip}")
+                    elif "[HEARTBEAT]" in msg:
+                        last_heartbeat = time.time()
             except Exception as e:
                 print(f"[System] Verbindung unterbrochen: {e}")
+                try:
+                    sock.shutdown(socket.SHUT_RDWR)
+                    sock.close()
+                except:
+                    print("")
+                time.sleep(2)
 
 def get_ring(msg):
     res = []
@@ -59,10 +78,10 @@ def run_backup_server():
     threading.Thread(target=monitor_message, daemon=True).start()
     while True:
         time.sleep(1)
-        if time.time() - last_heartbeat > HEARTBEAT_TIMEOUT and False:
+        if time.time() - last_heartbeat > HEARTBEAT_TIMEOUT:
             print("[ÜBERNAHME] Kein Heartbeat erkannt. Backup-Server wird aktiv.")
             logging.warning("Backup-Server übernimmt wegen Serverausfall.")
-            start_server()
+            print("start_server()")
             break
 
 def handle_client(conn, addr):
@@ -103,7 +122,7 @@ def broadcast(message, sender_conn):
                     client.close()
                     clients.pop(client, None)
 
-def start_server():
+def start_server(): # Todo: change. The server has to connect to the clients
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT)) # Hier wird sich mit dem Leader Server verbunden
     server.listen()
