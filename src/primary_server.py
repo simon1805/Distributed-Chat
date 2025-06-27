@@ -14,6 +14,7 @@ lock = threading.Lock()
 ring=None
 leader=PRIMARY_SERVER_HOST
 
+# Hier wird jede Nachricht von dem Client behandelt
 def handle_client(conn, addr, join_msg):
     global clients_ip
     username = ""
@@ -46,11 +47,11 @@ def handle_client(conn, addr, join_msg):
         print(f"{username} getrennt.")
         clients_ip.remove(addr)
         conn.close()
-
+# Ein neuer Server wird hier dem System hinzugefügt
 def handle_server(conn, addr):
     global ring
     global leader
-    global clients
+    global clients_ip
     
     try:
         print("Backupserver möchte sich anschließen")
@@ -59,14 +60,14 @@ def handle_server(conn, addr):
             servers[conn]= addr[0]
             ring = form_ring(servers.values())
         print(f"Ring: {ring}")
-        broadcast(f"[RING]{ring}[LEADER]{leader}[CLIENT]{list(clients.values())}",conn, "server")
+        broadcast(f"[RING]{ring}[LEADER]{leader}[CLIENT]{clients_ip}",conn, "server")
     except Exception as e:
         logging.error(f"Fehler bei Server mit {addr}: {e}")
         print(e)
 
 
 
-
+# sendet eine Nachricht entweder zum Client oder Server
 def broadcast(message, sender_conn, typ):
     with lock:
         if typ=="client":
@@ -84,7 +85,7 @@ def broadcast(message, sender_conn, typ):
                 except Exception as e:
                     server.close()
                     print(e)
-
+# sendet eine Nachricht als heartbeat an die Server
 def heartbeat():
     while True:
         for conn in servers.keys():
@@ -94,6 +95,7 @@ def heartbeat():
                 conn.close()
         time.sleep(HEARTBEAT_INTERVAL)
 
+# start des Servers
 def start_server():
     global servers
     
@@ -103,9 +105,8 @@ def start_server():
     print(servers)
     print(f"[START] Primärer Server läuft auf {PRIMARY_SERVER_HOST}:{PRIMARY_SERVER_PORT}")
     print("Primärer Server gestartet.")
-
+    # hier wird jedem Server ein hearbeat gesendet um zu zeigen, dass der Server noch intakt ist
     threading.Thread(target=heartbeat, daemon=True).start()
-
     while True:
         conn, addr = server.accept()
         join_msg = conn.recv(1024).decode()
@@ -113,6 +114,7 @@ def start_server():
             threading.Thread(target=handle_client, args=(conn, addr, join_msg), daemon=True).start()
         elif join_msg.startswith("[SERVER]"):
             threading.Thread(target=handle_server, args=(conn, addr), daemon=True).start()
+            print("Server Join")
             
 # forms a ring out of the server List
 def form_ring(members):

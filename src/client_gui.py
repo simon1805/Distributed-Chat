@@ -9,7 +9,11 @@ from config import PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT
 #python backup_server.py
 #python client_gui.py
 
+
+
 class ChatClientGUI:
+    no_server = False
+    server_ip = PRIMARY_SERVER_HOST
     def __init__(self):
         self.sock = None
         self.username = ""
@@ -31,7 +35,18 @@ class ChatClientGUI:
         self.window.protocol("WM_DELETE_WINDOW", self.on_close)
 
         threading.Thread(target=self.receive_messages, daemon=True).start()
+        threading.Thread(target=self.listen_for_backup, daemon=True).start()
         self.window.mainloop()
+
+    def listen_for_backup(self):
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind(("", PRIMARY_SERVER_PORT))
+        server.listen()
+        while True:
+            conn, addr = server.accept()
+            msg = conn.recv(1024).decode()
+            print(msg)
+        
 
     def prompt_username(self):
         self.username = simpledialog.askstring("Benutzername", "Gib deinen Benutzernamen ein:", parent=self.window)
