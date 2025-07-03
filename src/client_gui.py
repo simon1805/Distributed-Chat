@@ -46,6 +46,8 @@ class ChatClientGUI:
             conn, addr = server.accept()
             msg = conn.recv(1024).decode()
             print(msg)
+            if msg.startswith("[NEWSERVER]"):
+                self.connect_to_server()
         
 
     def prompt_username(self):
@@ -57,13 +59,18 @@ class ChatClientGUI:
         while True:
             try:
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.sock.connect((PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT))
+                self.sock.connect((self.server_ip, PRIMARY_SERVER_PORT))
                 self.sock.send(f"[JOIN] {self.username}".encode())
                 self.display_message("[System] Verbunden mit dem Server.")
                 break
             except:
                 self.display_message("[System] Server nicht erreichbar. Neuer Versuch in 2 Sekunden...")
+                print("[System] Server nicht erreichbar. Neuer Versuch in 2 Sekunden...")
+                if not self.no_server:
+                    self.no_server = True
                 time.sleep(2)
+                if not self.no_server:
+                    break
 
     def receive_messages(self):
         while True:

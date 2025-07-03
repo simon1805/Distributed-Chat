@@ -2,7 +2,7 @@ import socket
 import threading
 import time
 import logging
-from config import BACKUP_SERVER_HOST, BACKUP_SERVER_PORT, PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT, HEARTBEAT_INTERVAL, ZERO_HOST
+from config import  PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT, HEARTBEAT_INTERVAL
 
 # Logging konfigurieren
 logging.basicConfig(filename='chat.log', level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -47,6 +47,7 @@ def handle_client(conn, addr, join_msg):
         print(f"{username} getrennt.")
         clients_ip.remove(addr)
         conn.close()
+        
 # Ein neuer Server wird hier dem System hinzugefügt
 def handle_server(conn, addr):
     global ring
@@ -85,6 +86,7 @@ def broadcast(message, sender_conn, typ):
                 except Exception as e:
                     server.close()
                     print(e)
+                    
 # sendet eine Nachricht als heartbeat an die Server
 def heartbeat():
     while True:
