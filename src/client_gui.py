@@ -15,6 +15,7 @@ class ChatClientGUI:
     no_server = False
     server_ip = PRIMARY_SERVER_HOST
     def __init__(self):
+        self.server_ip=PRIMARY_SERVER_HOST
         self.sock = None
         self.username = ""
         self.window = tk.Tk()
@@ -47,6 +48,7 @@ class ChatClientGUI:
             msg = conn.recv(1024).decode()
             print(msg)
             if msg.startswith("[NEWSERVER]"):
+                self.server_ip=addr[0]
                 self.connect_to_server()
         
 
@@ -59,18 +61,15 @@ class ChatClientGUI:
         while True:
             try:
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                print("Connect to server ip:"+ self.server_ip)
                 self.sock.connect((self.server_ip, PRIMARY_SERVER_PORT))
+                print(self.sock)
                 self.sock.send(f"[JOIN] {self.username}".encode())
                 self.display_message("[System] Verbunden mit dem Server.")
                 break
             except:
                 self.display_message("[System] Server nicht erreichbar. Neuer Versuch in 2 Sekunden...")
                 print("[System] Server nicht erreichbar. Neuer Versuch in 2 Sekunden...")
-                if not self.no_server:
-                    self.no_server = True
-                time.sleep(2)
-                if not self.no_server:
-                    break
 
     def receive_messages(self):
         while True:

@@ -109,14 +109,16 @@ def create_connections():
             except Exception as e:
                 print(f"[FEHLER] Verbindung zu {server_ip} fehlgeschlagen: {e}")
     for client in client_ip:
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect((client[0], PRIMARY_SERVER_PORT))
-            print(f"[VERBINDUNG] Verbunden mit Client {client}")
-            message = f"[NEWSERVER]"
-            sock.send(message.encode())
-        except Exception as e:
-            print(f"[FEHLER] Verbindung zu {client} fehlgeschlagen: {e}")
+        while True:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.connect((client[0], PRIMARY_SERVER_PORT))
+                print(f"[VERBINDUNG] Verbunden mit Client {client}")
+                message = "[NEWSERVER]"
+                sock.send(message.encode())
+                break
+            except Exception as e:
+                print(f"[FEHLER] Verbindung zu {client} fehlgeschlagen: {e}")
     print(clients)
     print(servers)
     start_server()
