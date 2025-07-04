@@ -65,6 +65,8 @@ def handle_server(conn, addr):
     except Exception as e:
         logging.error(f"Fehler bei Server mit {addr}: {e}")
         print(e)
+    
+    print(servers)
 
 
 
@@ -90,10 +92,11 @@ def broadcast(message, sender_conn, typ):
 # sendet eine Nachricht als heartbeat an die Server
 def heartbeat():
     while True:
-        for conn in servers.keys():
+        for conn in list(servers.keys()):
             try:
                 conn.send(b"[HEARTBEAT]")
             except Exception as e:
+                print(f"Heartbeat Fehler: {e}")
                 conn.close()
         time.sleep(HEARTBEAT_INTERVAL)
 

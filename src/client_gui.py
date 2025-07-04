@@ -35,7 +35,9 @@ class ChatClientGUI:
         self.connect_to_server()
         self.window.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        threading.Thread(target=self.receive_messages, daemon=True).start()
+        self.stop_event = threading.Event()
+        self.receive_messages_thread = threading.Thread(target=self.receive_messages, daemon=True)
+        self.receive_messages_thread.start()
         threading.Thread(target=self.listen_for_backup, daemon=True).start()
         self.window.mainloop()
 
@@ -48,8 +50,19 @@ class ChatClientGUI:
             msg = conn.recv(1024).decode()
             print(msg)
             if msg.startswith("[NEWSERVER]"):
+                self.stop_event.set() 
+                if self.sock:
+                    try:
+                        self.sock.shutdown(socket.SHUT_RDWR)
+                        self.sock.close()
+                    except:
+                        pass
+                    time.sleep(2)  # Give time for cleanup
+                self.sock= conn
                 self.server_ip=addr[0]
-                self.connect_to_server()
+                self.stop_event.clear()
+                self.receive_messages_thread = threading.Thread(target=self.receive_messages, daemon=True)
+                self.receive_messages_thread.start()
         
 
     def prompt_username(self):
@@ -72,12 +85,15 @@ class ChatClientGUI:
                 print("[System] Server nicht erreichbar. Neuer Versuch in 2 Sekunden...")
 
     def receive_messages(self):
-        while True:
+        print("Start receiving messages")
+        while not self.stop_event.is_set():
             try:
                 msg = self.sock.recv(1024).decode()
                 if msg:
                     self.display_message(msg)
             except:
+                if self.stop_event.is_set():
+                    break
                 self.display_message("[System] Verbindung unterbrochen. Versuche erneut zu verbinden...")
                 try:
                     self.sock.shutdown(socket.SHUT_RDWR)
@@ -89,6 +105,7 @@ class ChatClientGUI:
 
     def send_message(self, event=None):
         msg = self.msg_entry.get()
+        print("Send message")
         if msg:
             try:
                 self.sock.send(f"{self.username}: {msg}".encode())
