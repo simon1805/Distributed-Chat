@@ -1,0 +1,9 @@
+31.05:
+Client lässt sich mit dem Server verbinden und Texte senden.
+Wenn ein neuer Server hinzukommt, nimmt der Server den Server auf und sendet ihm den aktuell RING sowie wer LEADER ist. 
+
+TODO:
+- Der Leader muss den Servern die aktuelle Liste, der Clients geben. Da im Falle eines ausfalls der neue Server übernehmen kann.
+- Weiterhin soll der Leader einen Heartbeat senden, dass er noch da ist.
+- Wer wird neuer Leader und was macht der neue Server
+- Können mehr als ein CLient aus einem anderen Gerät teilnehmen?
