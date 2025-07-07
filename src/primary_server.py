@@ -26,27 +26,29 @@ def handle_client(conn, addr, join_msg):
             with lock:
                 clients[conn] = username
             clients_ip.append(addr)
-            broadcast(f"[System] {username} ist dem Chat beigetreten.", conn,"client")
+            logging.info(f"{username} from {addr} connected.")
+            broadcast(f"[System] {username} has joined the chat.", conn, "client")
             broadcast(f"[CLIENT]{clients_ip}",conn, "server")
-            print(f"{username} von {addr} verbunden.")
+            print(f"{username} from {addr} connected.")
 
         while True:
             msg = conn.recv(1024).decode()
             if not msg:
                 break
             print(f"{msg}")
+            logging.info(msg)
             broadcast(msg, conn,"client")
-
+            if msg.startswith("[LEAVE]"):
+                with lock:
+                    clients.pop(conn)
+                broadcast(f"[System] {username} has left the chat.", conn, "client")
+                clients_ip.remove(addr)
+                broadcast(f"[CLIENT]{clients_ip}",conn, "server")
+                conn.close()
+                break
     except Exception as e:
-        logging.error(f"Fehler bei {addr}: {e}")
-    finally: # Hier wird der Client die verbindung schließen.
-        with lock:
-             # Todo: wird nicht aufgerufen
-            clients.pop(conn)
-            broadcast(f"[System] {username} hat den Chat verlassen.", conn,"client")
-        print(f"{username} getrennt.")
-        clients_ip.remove(addr)
-        conn.close()
+        logging.error(f"Error on {addr}: {e}")
+        
         
 # Ein neuer Server wird hier dem System hinzugefügt
 def handle_server(conn, addr):
@@ -55,19 +57,17 @@ def handle_server(conn, addr):
     global clients_ip
     
     try:
-        print("Backupserver möchte sich anschließen")
+        print("Backup server wants to join")
         print(addr[0])
         with lock:
             servers[conn]= addr[0]
             ring = form_ring(servers.values())
         print(f"Ring: {ring}")
+        logging.info(f"Server {addr[0]} connected.")
         broadcast(f"[RING]{ring}[LEADER]{leader}[CLIENT]{clients_ip}",conn, "server")
     except Exception as e:
-        logging.error(f"Fehler bei Server mit {addr}: {e}")
-        print(e)
-    
-    print(servers)
-
+        logging.error(f"Error with server at {addr}: {e}")
+        print(f"Error with server at {addr}: {e}")
 
 
 # sendet eine Nachricht entweder zum Client oder Server
@@ -91,13 +91,17 @@ def broadcast(message, sender_conn, typ):
                     
 # sendet eine Nachricht als heartbeat an die Server
 def heartbeat():
+    global ring
     while True:
         for conn in list(servers.keys()):
             try:
                 conn.send(b"[HEARTBEAT]")
             except Exception as e:
-                print(f"Heartbeat Fehler: {e}")
+                print(f"Heartbeat Error: {e}")
                 conn.close()
+                servers.pop(conn, None)
+                ring = form_ring(servers.values())
+                broadcast(f"[SERVER]{ring}",conn, "server")
         time.sleep(HEARTBEAT_INTERVAL)
 
 # start des Servers
@@ -107,9 +111,9 @@ def start_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT))
     server.listen()
+    logging.info(f"[START] Primary server started on {PRIMARY_SERVER_HOST}:{PRIMARY_SERVER_PORT}")
     print(servers)
-    print(f"[START] Primärer Server läuft auf {PRIMARY_SERVER_HOST}:{PRIMARY_SERVER_PORT}")
-    print("Primärer Server gestartet.")
+    print(f"[START] Primary server started on {PRIMARY_SERVER_HOST}:{PRIMARY_SERVER_PORT}")
     # hier wird jedem Server ein hearbeat gesendet um zu zeigen, dass der Server noch intakt ist
     threading.Thread(target=heartbeat, daemon=True).start()
     while True:
