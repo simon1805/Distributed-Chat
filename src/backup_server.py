@@ -2,8 +2,9 @@ import socket
 import threading
 import time
 import logging
+import json
 import ast
-from config import  PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT, HEARTBEAT_TIMEOUT, HEARTBEAT_INTERVAL
+from config import  PRIMARY_SERVER_HOST, PRIMARY_SERVER_PORT, HEARTBEAT_TIMEOUT, HEARTBEAT_INTERVAL,RING_PORT
 
 logging.basicConfig(filename='chat.log', level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
@@ -35,7 +36,7 @@ def monitor_message():
                         msg_ring= msg_leader[0].split("[RING]")[1]
                         client_ip=ast.literal_eval(msg_client[1])
                         leader=msg_leader[1]
-                        ring=ast.literal_eval(msg_ring)
+                        ring=form_ring(ast.literal_eval(msg_ring))
                         print(f"Servers: {ring}")
                         print(f"Clients: {client_ip}")
                         print(f"Leader: {leader}")
@@ -74,19 +75,15 @@ def check_leader():
     global local_ip
     global leader
     # Use BACKUP_SERVER_HOST as the local server's IP
-    local_ip = local_ip
-    if ring and len(ring) > 0:
-        first_server_ip = ring[0]
-        if first_server_ip == local_ip:
-            print("[INFO] This server is the leader (first in the ring).")
-            leader = local_ip
-            create_connections()
-            return True
-        else:
-            print(f"[INFO] This server is NOT the leader. Leader IP: {first_server_ip}")
-            return False
+    if len(ring)> 1:
+        start_lcr_election()
+    if leader == local_ip :
+        print("[INFO] This server is the leader (first in the ring).")
+        leader = local_ip
+        create_connections()
+        return True
     else:
-        print("[WARN] Ring is empty or not initialized.")
+        print(f"[INFO] This server is NOT the leader. Leader IP: {leader}")
         return False
 
 def create_connections():
@@ -247,6 +244,89 @@ def heartbeat():
             except Exception as e:
                 conn.close()
         time.sleep(HEARTBEAT_INTERVAL)
+
+def get_neighbour(ring, current_node_ip,direction="left"):
+    current_node_index = ring.index(current_node_ip) if current_node_ip in ring else -1
+    if current_node_index != -1:
+        if direction == "left":
+            if current_node_index +1 == len(ring):
+                return ring[0]
+            else:
+                return ring[current_node_index + 1]
+        else:
+            if current_node_index == 0:
+                return ring[len(ring)-1]
+            else:
+                return ring[current_node_index - 1]
+    else:
+        print(f"Node {current_node_ip} not found in the ring.")
+        return None
+     
+def start_lcr_election():
+    global ring
+    global local_ip
+    global leader
+    participant = False
+    leader_ip= ""
+    ring_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    ring_socket.bind((local_ip, RING_PORT))
+
+    print("Node is up and running at {}:{}".format(local_ip, RING_PORT))
+    time.sleep(4)
+
+    # LCR Election Logic
+    election_message={
+        "mid": local_ip,
+        "isLeader": False
+        }
+    
+    ring_socket.sendto(json.dumps(election_message).encode(), get_neighbour(ring, local_ip, "left"))
+    print("Election message sent to left neighbour: {}".format(get_neighbour(ring, local_ip, "left")))
+
+    while leader_ip == "":
+        try:
+            buffer_size = 1024
+            data, address = ring_socket.recvfrom(buffer_size)
+            print("Received election message from {}: {}".format(address, data.decode()))
+            election_message = json.loads(data.decode())
+            if data !="":
+                if election_message['isLeader']:
+                    print("Leader found: {}".format(election_message['mid']))
+                    leader_ip = election_message['mid']
+                    # forward received election message to left neighbour
+                    participant = False
+                    ring_socket.sendto(json.dumps(election_message).encode(), get_neighbour(ring, local_ip, "left"))
+
+                elif election_message['mid'] < local_ip and not participant:
+                    print("Lower Ip found: {}".format(election_message['mid']))
+                    new_election_message = {
+                        "mid": local_ip,
+                        "isLeader": False
+                    }
+                    participant = True
+                    # send new election message to left neighbour
+                    ring_socket.sendto(json.dumps(new_election_message).encode(), get_neighbour(ring, local_ip, "left"))
+
+                elif election_message['mid'] > local_ip:
+                    # send received election message to left neighbour
+                    print("Higher Ip found: {}".format(election_message['mid']))
+                    participant = True
+                    ring_socket.sendto(json.dumps(election_message).encode(), get_neighbour(ring, local_ip, "left"))
+
+                elif election_message['mid'] == local_ip:
+                    print("Thats me! I am the leader now.")
+                    leader_ip = local_ip
+                    new_election_message = {
+                        "mid": local_ip,
+                        "isLeader": True
+                    }
+                    # send new election message to left neighbour
+                    ring_socket.sendto(json.dumps(new_election_message).encode(), get_neighbour(ring, local_ip, "left"))
+        except Exception as e:
+            print("Error receiving data: {}".format(e))
+    print("Election finished. Leader is: {}".format(leader_ip))
+    leader = leader_ip
+    ring_socket.close()
         
 if __name__ == "__main__":
     run_backup_server()
