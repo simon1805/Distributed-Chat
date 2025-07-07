@@ -17,6 +17,8 @@ leader=""
 sock = None
 local_ip= ""
 servers = {}
+message_thread = None
+is_leader = False
 
 # hier werden die reinkommenden Nachrichten behandelt
 def monitor_message():
@@ -25,7 +27,8 @@ def monitor_message():
     global leader
     global last_heartbeat
     global client_ip
-    while True:
+    global is_leader
+    while not is_leader: #leader!=local_ip wenn unterschiedliches Gerät
             try:
                 msg = sock.recv(1024).decode()
                 if msg:
@@ -48,19 +51,16 @@ def monitor_message():
                     elif "[HEARTBEAT]" in msg:
                         last_heartbeat = time.time()
             except Exception as e:
-                print(f"[System] Verbindung unterbrochen: {e}")
-                try:
-                    sock.shutdown(socket.SHUT_RDWR)
-                    sock.close()
-                except:
-                    print("")
+                print(f"[System] Nachrichtverbindung unterbrochen: {e}")
                 time.sleep(2)
 
 # Hier startet der Backupserver
 def run_backup_server():
     global last_heartbeat
+    global message_thread
     join_system()
-    threading.Thread(target=monitor_message, daemon=True).start()
+    message_thread = threading.Thread(target=monitor_message, daemon=True)
+    message_thread.start()
     while True:
         time.sleep(1)
         if time.time() - last_heartbeat > HEARTBEAT_TIMEOUT:
@@ -74,6 +74,7 @@ def check_leader():
     global ring
     global local_ip
     global leader
+    global is_leader
     # Use BACKUP_SERVER_HOST as the local server's IP
     if len(ring)> 1:
         start_lcr_election()
@@ -92,6 +93,7 @@ def create_connections():
     global servers
     global clients
     global leader
+    print(sock)
 
     # Verbinde zu jedem Client im Ring
     for server_ip in ring:
@@ -104,26 +106,28 @@ def create_connections():
                 message = f"[NEWSERVER][RING] {ring} [LEADER] {leader} [CLIENT] {list(clients.values())}"
                 sock.send(message.encode())
             except Exception as e:
-                print(f"[FEHLER] Verbindung zu {server_ip} fehlgeschlagen: {e}")
+                print(f"[FEHLER] Verbindung zu Server{server_ip} fehlgeschlagen: {e}")
     for client in client_ip:
         while True:
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                sock.connect((client[0], PRIMARY_SERVER_PORT))
+                client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                client_socket.connect((client[0], PRIMARY_SERVER_PORT))
                 print(f"[VERBINDUNG] Verbunden mit Client {client}")
                 message = "[NEWSERVER]"
-                sock.send(message.encode())
+                client_socket.send(message.encode())
+                with lock:
+                    clients[client_socket] = client[0]
+                threading.Thread(target=handle_client, args=(client_socket, client, f"{client} Bereit"), daemon=True).start()
                 break
             except Exception as e:
-                print(f"[FEHLER] Verbindung zu {client} fehlgeschlagen: {e}")
-    print(clients)
-    print(servers)
+                print(f"[FEHLER] Verbindung zu Client {client} fehlgeschlagen: {e}")
     start_server()
 
 # Hier wird jede Nachricht von dem Client behandelt
 def handle_client(conn, addr, join_msg):
     global client_ip
     
+    print(f"Clients: {clients}")
     username = ""
     try:
         # Empfange erste Nachricht mit Benutzernamen
@@ -134,8 +138,9 @@ def handle_client(conn, addr, join_msg):
                 clients[conn] = username
             client_ip.append(addr)
             broadcast(f"[System] {username} ist dem Chat beigetreten.", conn,"client")
-            broadcast(f"[CLIENT]{client_ip}",conn, "server")
+            #broadcast(f"[CLIENT]{client_ip}",conn, "server")
             print(f"{username} von {addr} verbunden.")
+            
 
         while True:
             msg = conn.recv(1024).decode()
@@ -146,6 +151,7 @@ def handle_client(conn, addr, join_msg):
 
     except Exception as e:
         logging.error(f"Fehler bei {addr}: {e}")
+        print("Fehler")
     finally: # Hier wird der Client die verbindung schließen.
         with lock:
              # Todo: wird nicht aufgerufen
@@ -176,17 +182,28 @@ def broadcast(message, sender_conn,typ):
 def start_server(): # Todo: change. The server has to connect to the clients
     global servers
     global local_ip
+    global sock
+    global message_thread
     
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((local_ip, PRIMARY_SERVER_PORT))
-    server.listen()
+    
+    #message_thread.join() 
+    try:
+        sock.shutdown(socket.SHUT_RDWR)
+        sock.close()
+        print(" Socket wurde geschlossen.")
+    except:
+        print(" Socket konnte nicht geschlossen werden.")
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind((local_ip, PRIMARY_SERVER_PORT))
+    sock.listen() # Wait for the message monitoring thread to finish before starting the server
     print(f"[START] Primärer Server läuft auf {local_ip}:{PRIMARY_SERVER_PORT}")
     print("Primärer Server gestartet.")
     
     # hier wird jedem Server ein hearbeat gesendet um zu zeigen, dass der Server noch intakt ist
     #threading.Thread(target=heartbeat, daemon=True).start()
     while True:
-        conn, addr = server.accept()
+        print(f"Clients: {clients}")
+        conn, addr = sock.accept()
         join_msg = conn.recv(1024).decode()
         if join_msg.startswith("[JOIN] "):
             threading.Thread(target=handle_client, args=(conn, addr, join_msg), daemon=True).start()
