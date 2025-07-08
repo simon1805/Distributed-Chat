@@ -76,7 +76,7 @@ def run_backup_server():
             print("[TAKEOVER] No heartbeat detected. Backup server is taking over.")
             logging.info("[TAKEOVER] No heartbeat detected. Backup server is taking over.")
             check_leader()
-            break
+            
 
 # Entscheidung welcher Server übernimmt
 def check_leader():
@@ -279,19 +279,19 @@ def heartbeat():
                 broadcast(f"[SERVER]{ring}",conn, "server")  
         time.sleep(HEARTBEAT_INTERVAL)
 
-def get_neighbour(ring, current_node_ip,direction="left"):
+def get_neighbour(ring, current_node_ip, direction="left"):
     current_node_index = ring.index(current_node_ip) if current_node_ip in ring else -1
     if current_node_index != -1:
         if direction == "left":
-            if current_node_index +1 == len(ring):
-                return ring[0]
+            if current_node_index + 1 == len(ring):
+                return (ring[0], RING_PORT)
             else:
-                return ring[current_node_index + 1]
+                return (ring[current_node_index + 1], RING_PORT)
         else:
             if current_node_index == 0:
-                return ring[len(ring)-1]
+                return (ring[len(ring)-1], RING_PORT)
             else:
-                return ring[current_node_index - 1]
+                return (ring[current_node_index - 1], RING_PORT)
     else:
         print(f"Node {current_node_ip} not found in the ring.")
         return None
