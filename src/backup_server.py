@@ -99,6 +99,7 @@ def check_leader():
     else:
         print(f"[INFO] This server is NOT the leader. Leader IP: {leader}")
         listen_for_backup()
+        print(ring)
         return False
 
 def create_connections():
@@ -108,7 +109,7 @@ def create_connections():
     global clients
     global leader
     print(sock)
-
+    servers = {}
     # Verbinde zu jedem Client im Ring
     for server_ip in ring:
         if server_ip != local_ip:  # Vermeide Verbindung zum eigenen Server
@@ -120,7 +121,7 @@ def create_connections():
                 sock.send(message.encode())
                 with lock:
                     servers[sock] = server_ip
-                threading.Thread(target=handle_server, args=(sock, server_ip, f"{server_ip} Bereit"), daemon=True).start()
+                print(servers)
             except Exception as e:
                 print(f"[ERROR] Connection to server {server_ip} failed: {e}")
     for client in client_ip:
@@ -219,20 +220,18 @@ def start_server(): # Todo: change. The server has to connect to the clients
     global local_ip
     global sock
     global message_thread
+    global ring
     
     
     #message_thread.join() 
-    try:
-        sock.shutdown(socket.SHUT_RDWR)
-        sock.close()
-    except:
-        print(" Socket not closed.")
+    
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((local_ip, PRIMARY_SERVER_PORT))
     sock.listen() # Wait for the message monitoring thread to finish before starting the server
     print(f"[START] Primary server is running on {local_ip}:{PRIMARY_SERVER_PORT}")
     
     # hier wird jedem Server ein hearbeat gesendet um zu zeigen, dass der Server noch intakt ist
+    print(ring)
     threading.Thread(target=heartbeat, daemon=True).start()
     while True:
         print(f"Clients: {clients}")
@@ -293,6 +292,7 @@ def heartbeat():
             try:
                 conn.send(b"[HEARTBEAT]")
             except Exception as e:
+                print(e)
                 conn.close()
                 servers.pop(conn, None)
                 ring = form_ring(servers.values())
