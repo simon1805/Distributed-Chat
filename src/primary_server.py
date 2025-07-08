@@ -38,6 +38,7 @@ def handle_client(conn, addr, join_msg):
             print(f"{msg}")
             logging.info(msg)
             broadcast(msg, conn,"client")
+            broadcast(f"[MESSAGE] {msg}", conn,"server")
             if msg.startswith("[LEAVE]"):
                 with lock:
                     clients.pop(conn)

@@ -32,7 +32,6 @@ def monitor_message():
             try:
                 msg = sock.recv(1024).decode()
                 if msg:
-                    logging.info(f"Message: {msg}")
                     # Hier werden die Daten von dem Leader übergeben
                     if "[RING]" in msg and "[LEADER]" in msg and "[CLIENT]" in msg:
                         msg_client = msg.split("[CLIENT]")
@@ -41,16 +40,22 @@ def monitor_message():
                         client_ip=ast.literal_eval(msg_client[1])
                         leader=msg_leader[1]
                         ring=form_ring(ast.literal_eval(msg_ring))
+                        logging.info(f"Received ring: {ring}, leader: {leader}, clients: {client_ip}")
                         print(f"Servers: {ring}")
                         print(f"Clients: {client_ip}")
                         print(f"Leader: {leader}")
                     # wenn ein neuer Client in das System eintritt
                     elif "[CLIENT]" in msg:
                         client_ip=ast.literal_eval(msg.split("[CLIENT]")[1])
+                        logging.info(f"Clients changed: {client_ip}")
                         print(f"Client arrived/gone: {client_ip}")
                     elif "[SERVER]" in msg:
                         ring=form_ring(ast.literal_eval(msg.split("[SERVER]")[1]))
+                        logging.info(f"Servers changed: {ring}")
                         print(f"Servers changed: {ring}")
+                    elif "[MESSAGE]" in msg:
+                        logging.info(msg.split("[MESSAGE]")[1])
+                        print(msg.split("[MESSAGE]")[1])
                     # Heartbeat von dem Leader
                     elif "[HEARTBEAT]" in msg:
                         last_heartbeat = time.time()
@@ -157,6 +162,7 @@ def handle_client(conn, addr, join_msg):
                 break
             print(f"{msg}")
             broadcast(msg, conn,"client")
+            broadcast(f"[MESSAGE] {msg}", conn,"server")
             logging.info(msg)
             if msg.startswith("[LEAVE]"):
                 with lock:
