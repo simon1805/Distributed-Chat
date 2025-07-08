@@ -88,6 +88,8 @@ def check_leader():
     logging.info(f"New leader is: {leader} ")
     if len(ring)> 1:
         start_lcr_election()
+    else:
+        leader=local_ip
     if leader == local_ip :
         print("[INFO] This server is the leader.")
         leader = local_ip
@@ -96,6 +98,7 @@ def check_leader():
         return True
     else:
         print(f"[INFO] This server is NOT the leader. Leader IP: {leader}")
+        listen_for_backup()
         return False
 
 def create_connections():
@@ -113,7 +116,7 @@ def create_connections():
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 sock.connect((server_ip, PRIMARY_SERVER_PORT))
                 print(f"[CONNECTION] Connected to server {server_ip}")
-                message = f"[NEWSERVER][RING] {ring} [LEADER] {leader} [CLIENT] {list(clients.values())}"
+                message = f"[NEWSERVER]"
                 sock.send(message.encode())
                 with lock:
                     servers[sock] = server_ip
@@ -193,6 +196,23 @@ def broadcast(message, sender_conn,typ):
                 except Exception as e:
                     server.close()
                     print(e)
+
+def listen_for_backup():
+        global sock
+        global leader
+
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind(("", PRIMARY_SERVER_PORT))
+        server.listen()
+        while True:
+            conn, addr = server.accept()
+            msg = conn.recv(1024).decode()
+            print(msg)
+            if msg.startswith("[NEWSERVER]"):
+                sock= conn
+                leader=addr[0]
+                
+                threading.Thread(target=monitor_message, daemon=True)
 
 def start_server(): # Todo: change. The server has to connect to the clients
     global servers
